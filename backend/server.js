@@ -8,9 +8,19 @@ const app = express();
 
 app.use(cors());
 
-const upload = multer({dest: "./uploads/"});
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, './uploads/');
+    },
+    filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname); // Get the original file extension
+        cb(null, Date.now() + ext);  // Store file with its original extension and a timestamp
+    }
+});
 
-app.post("/upload", upload.single("audioFile"), (req, res) => {
+const upload = multer({ storage: storage });
+
+app.post("/api/upload", upload.single("audioFile"), (req, res) => {
     if (!req.file) {
         return res.status(400).send({'error': 'No file uploaded'});
     }
@@ -22,6 +32,7 @@ app.post("/upload", upload.single("audioFile"), (req, res) => {
 
     pythonProcess.stdout.on('data', data => {
         const output = data.toString();
+        console.log("Python Output:", output);  // Ensure this is printed
         res.json({ analysis: output });
     });
 
@@ -36,7 +47,7 @@ app.post("/upload", upload.single("audioFile"), (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Listening on port ${PORT}`);
 })
