@@ -3,6 +3,7 @@ const cors = require('cors');
 const multer = require("multer");
 const path = require("path");
 const { spawn } = require("child_process");
+const {unlink} = require("node:fs");
 
 const app = express();
 
@@ -30,20 +31,34 @@ app.post("/api/upload", upload.single("audioFile"), (req, res) => {
         path.join(__dirname, req.file.path),
     ]);
 
+    let output = '';
+    let errorOutput = '';
+
     pythonProcess.stdout.on('data', data => {
-        const output = data.toString();
-        console.log("Python Output:", output);  // Ensure this is printed
-        res.json({ analysis: output });
+        output += data.toString();
     });
 
     pythonProcess.stderr.on('data', data => {
-        console.error('stderr:', data);
+        errorOutput += data.toString();
     });
 
     pythonProcess.on('close', (code) => {
         if (code !== 0) {
+            console.error('Python script error:', errorOutput);
             res.status(500).send({'error': 'Error running python process'});
         }
+
+        try {
+            const analysis = JSON.parse(output);
+            res.json({analysis} );
+        } catch (parseError) {
+            console.error('Error parsing Python output:', parseError);
+            res.status(500).send({ error: 'Invalid output from Python script', details: parseError.message });
+        }
+
+        unlink(req.file.path, (err) => {
+            if (err) console.error('Error deleting uploaded file:', err);
+        });
     });
 });
 
